@@ -1,0 +1,185 @@
+extends ScrollContainer
+const resizeSpeed = 0.1
+
+signal indexChanged
+
+@export var card_scale: float = 1.0
+@export var card_current_scale = 1.3
+@export var scroll_duration = 0.4
+@export var card_current_index: int = 0
+
+var card_x_positions: Array = []
+var load_data
+
+@onready var tween: Tween
+@onready var margin_r: int = $CenterContainer/MarginContainer.get("theme_override_constants/margin_right")
+@onready var card_space: int = $CenterContainer/MarginContainer/HBoxContainer.get("theme_override_constants/separation")
+@onready var card_nodes: Array = $CenterContainer/MarginContainer/HBoxContainer.get_children()
+@onready var panel = get_parent().get_node("Panel")
+
+func _ready():
+	updateBuyLabels()
+	load_data = SaveGame.load_game()["upgrades"]
+	tween = get_tree().create_tween()
+	await get_tree().process_frame
+	#scrollContainer/CenterContainer/MarginContainer/HBoxContainer.modulate.a = 
+	for _card in card_nodes:
+		var _card_pos_x: float = (margin_r + _card.position.x) - ((size.x - _card.size.x) / 2)
+		_card.pivot_offset = (_card.size / 2)
+		card_x_positions.append(_card_pos_x)
+	scroll_horizontal = card_x_positions[card_current_index]
+	scroll()
+
+
+
+func _process(_delta: float) -> void:
+	for _index in range(card_x_positions.size()):
+		var _card_pos_x: float = card_x_positions[_index]
+		var _swipe_length: float = (card_nodes[_index].size.x / 2) + (card_space / 2)
+		var _swipe_current_length: float = abs(_card_pos_x - scroll_horizontal)
+		var _card_scale: float = remap(_swipe_current_length, _swipe_length, 0, card_scale, card_current_scale)
+		var _card_opacity: float = remap(_swipe_current_length, _swipe_length, 0, 0.3, 1)
+		_card_scale = clamp(_card_scale, card_scale, card_current_scale)
+		_card_opacity = clamp(_card_opacity, 0.3, 1)
+		card_nodes[_index].scale = Vector2(_card_scale, _card_scale)
+		card_nodes[_index].modulate.a = _card_opacity
+		if _swipe_current_length < _swipe_length:
+			card_current_index = _index
+			emit_signal("indexChanged")
+
+func scroll() -> void:
+	var behindArr = getAllExceptOne(card_nodes, card_current_index)
+	for i in behindArr:
+		i.z_index = 0
+	card_nodes[card_current_index].z_index = 1
+	tween = get_tree().create_tween()
+	tween.tween_property(self,"scroll_horizontal",card_x_positions[card_current_index],scroll_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	for _index in range(card_nodes.size()):
+		var _card_scale: float = card_current_scale if _index == card_current_index else card_scale
+		tween.tween_property(
+			card_nodes[_index],
+			"scale",
+			Vector2(_card_scale,_card_scale),
+			scroll_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	
+func _on_gui_input(event):
+	if event is InputEventMouseButton:
+		if event.pressed:
+			tween.kill()
+		else:
+			scroll()
+
+func _on_normal_clicked():
+	if card_current_index != 0:
+		tween = get_tree().create_tween()
+		card_current_index = 0
+		tween.tween_property(self,"scroll_horizontal",card_x_positions[card_current_index],scroll_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+func _on_copper_clicked():
+	if card_current_index != 1:
+		tween = get_tree().create_tween()
+		card_current_index = 1
+		tween.tween_property(self,"scroll_horizontal",card_x_positions[card_current_index],scroll_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+func _on_steel_clicked():
+	if card_current_index != 2:
+		tween = get_tree().create_tween()
+		card_current_index = 2
+		tween.tween_property(self,"scroll_horizontal",card_x_positions[card_current_index],scroll_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+func _on_carbon_clicked():
+	if card_current_index != 3:
+		tween = get_tree().create_tween()
+		card_current_index = 3
+		tween.tween_property(self,"scroll_horizontal",card_x_positions[card_current_index],scroll_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+
+func _on_normal_entered():
+	if card_current_index == 0:
+		panel.get_node("HBoxContainer/Panel/SmallText").text = ""
+		panel.get_node("AnimationPlayer").play("spawn")
+		panel.get_node("HBoxContainer/Panel/UpgradeLabel").text = "Forward speed: "+str(load_data[0][0])+"\nReverse speed: "+str(load_data[0][1])+"\nRotational acceleration: "+str(load_data[0][2])+"\nInventory: "+str(load_data[0][3])+"\nDiscount: "+str(load_data[0][4])
+		panel.get_node("HBoxContainer/PanelContainer/PowerUpLabel").text = "Boosts: "+str(load_data[0][5])+"\nGhosts: "+str(load_data[0][6])+"\n Shrinks: "+str(load_data[0][7])
+
+func _on_normal_exited():
+	if card_current_index == 0:
+		panel.get_node("AnimationPlayer").play("despawn")
+
+func _on_copper_entered():
+	if card_current_index == 1:
+		panel.get_node("AnimationPlayer").play("spawn")
+		if Global.unlocked[1]:
+			panel.get_node("HBoxContainer/Panel/SmallText").text = ""
+			panel.get_node("HBoxContainer/Panel/UpgradeLabel").text = "Forward speed: "+str(load_data[1][0])+"\nReverse speed: "+str(load_data[1][1])+"\nRotational acceleration: "+str(load_data[1][2])+"\nInventory: "+str(load_data[1][3])+"\nDiscount: "+str(load_data[1][4])
+			panel.get_node("HBoxContainer/PanelContainer/PowerUpLabel").text = "Boosts: "+str(load_data[1][5])+"\nGhosts: "+str(load_data[1][6])+"\n Shrinks: "+str(load_data[1][7])
+		else: # Not unlocked -> display description
+			panel.get_node("HBoxContainer/Panel/SmallText").text = "Better than the regular trolley at least...\nIt's not the most durable, so it might not handle as well as other options."
+			panel.get_node("HBoxContainer/PanelContainer/PowerUpLabel").text = "Max Upgrade Slots\n" + joinArrayToString(Global.trolleyPowers[1], ["\nSpeed: ", "\nReverse Speed: ", "\nRotation Speed: ", "\nInventory Space: ", "\nDiscount: "])
+			panel.get_node("HBoxContainer/Panel/UpgradeLabel").text = "Copper Trolley"
+func _on_copper_exited():
+	if card_current_index == 1:
+		panel.get_node("AnimationPlayer").play("despawn")
+func _on_steel_entered():
+	if card_current_index == 2:
+		panel.get_node("AnimationPlayer").play("spawn")
+		if Global.unlocked[2]:
+			panel.get_node("HBoxContainer/Panel/SmallText").text = ""
+			panel.get_node("HBoxContainer/Panel/UpgradeLabel").text = "Forward speed: "+str(load_data[2][0])+"\nReverse speed: "+str(load_data[2][1])+"\nRotational acceleration: "+str(load_data[2][2])+"\nInventory: "+str(load_data[2][3])+"\nDiscount: "+str(load_data[2][4])
+			panel.get_node("HBoxContainer/PanelContainer/PowerUpLabel").text = "Boosts: "+str(load_data[2][5])+"\nGhosts: "+str(load_data[2][6])+"\n Shrinks: "+str(load_data[2][7])
+		else: # Not unlocked -> display description
+			panel.get_node("HBoxContainer/Panel/SmallText").text = "A tough cart to carry your purchases...\nBut, it's heavy to move around, so navigating tight corners can be a real challenge."
+			panel.get_node("HBoxContainer/PanelContainer/PowerUpLabel").text = "Max Upgrade Slots\n" + joinArrayToString(Global.trolleyPowers[2], ["\nSpeed: ", "\nReverse Speed: ", "\nRotation Speed: ", "\nInventory Space: ", "\nDiscount: "])
+			panel.get_node("HBoxContainer/Panel/UpgradeLabel").text = "Steel Trolley"
+			
+func _on_steel_exited():
+	if card_current_index == 2:
+		panel.get_node("AnimationPlayer").play("despawn")
+	
+func _on_carbon_entered():
+	if card_current_index == 3:
+		panel.get_node("AnimationPlayer").play("spawn")
+		if Global.unlocked[3]:
+			panel.get_node("HBoxContainer/Panel/SmallText").text = ""
+			panel.get_node("HBoxContainer/Panel/UpgradeLabel").text = "Forward speed: "+str(load_data[3][0])+"\nReverse speed: "+str(load_data[3][1])+"\nRotational acceleration: "+str(load_data[3][2])+"\nInventory: "+str(load_data[3][3])+"\nDiscount: "+str(load_data[3][4])
+			panel.get_node("HBoxContainer/PanelContainer/PowerUpLabel").text = "Boosts: "+str(load_data[3][5])+"\nGhosts: "+str(load_data[3][6])+"\n Shrinks: "+str(load_data[3][7])
+		else: # Not unlocked -> display description
+			panel.get_node("HBoxContainer/Panel/SmallText").text = "The best of the lot. It's lightweight and agile.\nMaking it perfect for navigating crowded aisles with ease."
+			panel.get_node("HBoxContainer/PanelContainer/PowerUpLabel").text = "Max Upgrade Slots\n" + joinArrayToString(Global.trolleyPowers[3], ["\nSpeed: ", "\nReverse Speed: ", "\nRotation Speed: ", "\nInventory Space: ", "\nDiscount: "])
+			panel.get_node("HBoxContainer/Panel/UpgradeLabel").text = "Carbon Fiber Trolley"
+func _on_carbon_exited():
+	if card_current_index == 3:
+		panel.get_node("AnimationPlayer").play("despawn")
+
+
+func joinArrayToString(arr: Array, delimiterArr: Array) -> String:
+	var result = ""
+	var length = arr.size()
+	var delimiterCount = delimiterArr.size()
+
+	for i in range(length):
+		result += delimiterArr[i % delimiterCount]  # Use modulo to cycle through delimiters
+		result += str(arr[i])
+
+	return result
+
+func getAllExceptOne(myArray: Array, indexToExclude: int) -> Array:
+	var newArray = []
+
+	for i in range(myArray.size()):
+		if i != indexToExclude:
+			newArray.append(myArray[i])
+
+	return newArray
+
+
+func updateBuyLabels() -> void:
+	for i in range(Global.unlocked.size()):
+		var textNode = card_nodes[i].get_node("VBoxContainer/Label")
+		if !Global.unlocked[i]: # Locked
+			textNode.text = "Price: $" + str(Global.trolleyPriceArr[i])
+			card_nodes[i].theme = preload("res://Assets/UI/Themes/newLocked.tres")
+			textNode.theme = preload("res://Assets/UI/Themes/newLocked.tres")
+		else: # Unlocked
+			card_nodes[i].get_node("VBoxContainer/Label").text = "Unlocked"
+			card_nodes[i].theme = preload("res://Assets/UI/Themes/newUnlocked.tres")
+			textNode.theme = preload("res://Assets/UI/Themes/newUnlocked.tres")
