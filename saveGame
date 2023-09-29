@@ -1,0 +1,22 @@
+extends Node
+
+func save_game(dict):
+	var saveGame = FileAccess.open("user://SaveGame.save", FileAccess.WRITE)
+	var json_string = JSON.stringify(dict)
+	saveGame.store_line(json_string)
+	saveGame.close()
+
+func load_game():
+	if not FileAccess.file_exists("user://SaveGame.save"): #User hasn't played the game before
+		var r = []
+		for i in Global.abilityArray:
+			r.append(0)
+		return {"universal": {"currency": 0, "trolley": 0}, "upgrades": [r, r, r, r], "unlocked": [true,false,false,false]}
+	var saveGame = FileAccess.open("user://SaveGame.save", FileAccess.READ)
+	while saveGame.get_position() < saveGame.get_length(): # User has played the game before
+		var json_string = saveGame.get_line()
+		var json = JSON.new()
+		var _parse_result = json.parse(json_string)
+		var node_data = json.get_data()
+		saveGame.close()
+		return node_data
